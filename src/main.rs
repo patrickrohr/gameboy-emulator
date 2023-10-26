@@ -163,6 +163,8 @@ enum Instruction {
     CPL, // complement accumulator
     LD8(Ld8Location /* target */, Ld8Location /* source */),
     LD16(Ld16Target, Ld16Source),
+    DI,
+    EI,
 }
 
 impl Instruction {
@@ -567,6 +569,8 @@ impl Instruction {
             0xf0 => Instruction::LD8(Ld8Location::A, Ld8Location::Address8),
             // LD A, (C)
             0xf2 => Instruction::LD8(Ld8Location::A, Ld8Location::atC),
+            // DI
+            0xf3 => Instruction::DI,
             // OR A, d8
             0xf6 => Instruction::OP(Operator::OR, Operand::Immediate),
             // LD HL, SP+s8
@@ -575,6 +579,8 @@ impl Instruction {
             0xf9 => Instruction::LD16(Ld16Target::SP, Ld16Source::HL),
             // LD A, (a16)
             0xfa => Instruction::LD8(Ld8Location::A, Ld8Location::Address16),
+            // EI
+            0xfb => Instruction::EI,
             // CP A, d8
             0xfe => Instruction::OP(Operator::CP, Operand::Immediate),
 
@@ -592,27 +598,16 @@ struct Cpu {
     reg_hl: [u8; 2],
     reg_sp: [u8; 2],
     reg_pc: [u8; 2],
+    // EI sets ime to true on the *next* machine cycle (i.e., it sets ime_request).
+    ime: bool,
+    ime_request: bool,
     mem: MemMapper,
 
     cycles: usize,
 }
 
+// Register Getters / Setters
 impl Cpu {
-    fn new(mem: MemMapper) -> Cpu {
-        let mut cpu = Cpu {
-            reg_af: [0, 0],
-            reg_bc: [0, 0],
-            reg_de: [0, 0],
-            reg_hl: [0, 0],
-            reg_sp: [0, 0],
-            // Program counter is initialized at 0x100.
-            reg_pc: u16::to_le_bytes(0x100),
-            mem,
-            cycles: 0,
-        };
-        return cpu;
-    }
-
     fn get_a(&self) -> u8 {
         self.reg_af[1]
     }
@@ -758,9 +753,33 @@ impl Cpu {
     fn set_pc(&mut self, val: u16) {
         self.reg_pc = u16::to_le_bytes(val);
     }
+}
+
+// Core functionality
+impl Cpu {
+    fn new(mem: MemMapper) -> Cpu {
+        let mut cpu = Cpu {
+            reg_af: [0, 0],
+            reg_bc: [0, 0],
+            reg_de: [0, 0],
+            reg_hl: [0, 0],
+            reg_sp: [0, 0],
+            // Program counter is initialized at 0x100.
+            reg_pc: u16::to_le_bytes(0x100),
+            ime: false,
+            ime_request: false,
+            mem,
+            cycles: 0,
+        };
+        return cpu;
+    }
 
     fn cycle(&mut self) {
         self.cycles += 1;
+        // Set delayed IME register after EI.
+        if (self.ime_request) {
+            self.ime = true;
+        }
     }
 
     fn pc_fetch(&mut self) -> u8 {
@@ -785,7 +804,7 @@ impl Cpu {
             None => 0,
         };
 
-        let a = self.get_a(); 
+        let a = self.get_a();
         let (result, c1) = a.overflowing_add(val);
         let (result, c2) = result.overflowing_add(carry);
         let c = c1 || c2;
@@ -806,7 +825,7 @@ impl Cpu {
             None => 0,
         };
 
-        let a = self.get_a(); 
+        let a = self.get_a();
         let (result, c1) = a.overflowing_sub(val);
         let (result, c2) = result.overflowing_sub(carry);
         let c = c1 || c2;
@@ -844,7 +863,7 @@ impl Cpu {
         self.set_n_flag(!inc); // inc: false, dec: true
         self.set_h_flag(h);
 
-        match(operand) {
+        match (operand) {
             Operand::B => self.set_b(result),
             Operand::C => self.set_c(result),
             Operand::D => self.set_d(result),
@@ -937,7 +956,7 @@ impl Cpu {
                     _ => false,
                 };
                 self.jump(addr, conditionMet);
-            },
+            }
             Instruction::OP(operator, operand) => {
                 let op_val = match operand {
                     Operand::B => self.get_b(),
@@ -968,7 +987,7 @@ impl Cpu {
                         self.set_h_flag(true);
                         self.set_c_flag(false);
                         self.set_a(result);
-                    },
+                    }
                     Operator::OR => {
                         let result = self.get_a() | op_val;
                         self.set_z_flag(result == 0);
@@ -1111,6 +1130,8 @@ impl Cpu {
                     Ld8Location::Immediate => panic!("Invalid LD8 target"),
                 }
             }
+            Instruction::DI => self.ime = false,
+            Instruction::EI => self.ime_request = true,
 
             _ => return Err(()),
         };
