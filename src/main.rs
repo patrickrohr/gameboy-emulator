@@ -111,6 +111,27 @@ enum Operand {
     Immediate,
 }
 
+// LD8
+#[derive(Debug)]
+enum Ld8Location {
+    A,
+    B,
+    C,
+    D,
+    E,
+    H,
+    L,
+    atBC,
+    atDE,
+    atHL,
+    atHLInc,
+    atHLDec,
+    atC,
+    Address8,
+    Address16,
+    Immediate,
+}
+
 // LD16
 // TODO: should registers all be stored in one enum?
 #[derive(Debug)]
@@ -140,6 +161,7 @@ enum Instruction {
     SCF, // set carry flag
     DAA, // decimal adjust accumulator
     CPL, // complement accumulator
+    LD8(Ld8Location /* target */, Ld8Location /* source */),
     LD16(Ld16Target, Ld16Source),
 }
 
@@ -148,28 +170,233 @@ impl Instruction {
         match ext_opcode {
             // nop
             0x00 => Instruction::NOP,
-            // JP a16
-            0xc3 => Instruction::JP(JumpTarget::Immediate, JumpCondition::True),
-            // JP HL
-            0xe9 => Instruction::JP(JumpTarget::HL, JumpCondition::True),
-            // JP NZ,a16
-            0xc2 => Instruction::JP(JumpTarget::Immediate, JumpCondition::NotZeroFlag),
-            // JP Z,a16
-            0xca => Instruction::JP(JumpTarget::Immediate, JumpCondition::ZeroFlag),
-            // JP NC,a16
-            0xd2 => Instruction::JP(JumpTarget::Immediate, JumpCondition::NotCarryFlag),
-            // JP C,a16
-            0xda => Instruction::JP(JumpTarget::Immediate, JumpCondition::CarryFlag),
+            // LD BC, d16
+            0x01 => Instruction::LD16(Ld16Target::BC, Ld16Source::Immediate),
+            // LD (BC), A
+            0x02 => Instruction::LD8(Ld8Location::atBC, Ld8Location::A),
+            // INC B
+            0x04 => Instruction::OP(Operator::INC, Operand::B),
+            // DEC B
+            0x05 => Instruction::OP(Operator::DEC, Operand::B),
+            // LD B, d8
+            0x06 => Instruction::LD8(Ld8Location::B, Ld8Location::Immediate),
+            // LD (a16), SP
+            0x08 => Instruction::LD16(Ld16Target::Address, Ld16Source::SP),
+            // LD A, (BC)
+            0x0a => Instruction::LD8(Ld8Location::A, Ld8Location::atBC),
+            // INC C
+            0x0c => Instruction::OP(Operator::INC, Operand::C),
+            // DEC C
+            0x0d => Instruction::OP(Operator::DEC, Operand::C),
+            // LD C, d8
+            0x0e => Instruction::LD8(Ld8Location::C, Ld8Location::Immediate),
+
+            // LD DE, d16
+            0x11 => Instruction::LD16(Ld16Target::DE, Ld16Source::Immediate),
+            // LD (DE), A
+            0x12 => Instruction::LD8(Ld8Location::atDE, Ld8Location::A),
+            // INC D
+            0x14 => Instruction::OP(Operator::INC, Operand::D),
+            // DEC D
+            0x15 => Instruction::OP(Operator::DEC, Operand::D),
+            // LD D, d8
+            0x16 => Instruction::LD8(Ld8Location::D, Ld8Location::Immediate),
             // JR i8
             0x18 => Instruction::JP(JumpTarget::Offset, JumpCondition::True),
+            // LD A, (DE)
+            0x1a => Instruction::LD8(Ld8Location::A, Ld8Location::atDE),
+            // INC E
+            0x1c => Instruction::OP(Operator::INC, Operand::E),
+            // DEC E
+            0x1d => Instruction::OP(Operator::DEC, Operand::E),
+            // LD E, d8
+            0x1e => Instruction::LD8(Ld8Location::E, Ld8Location::Immediate),
+
             // JR NZ,i8
             0x20 => Instruction::JP(JumpTarget::Offset, JumpCondition::NotZeroFlag),
+            // LD HL, d16
+            0x21 => Instruction::LD16(Ld16Target::HL, Ld16Source::Immediate),
+            // LD (HL+), A
+            0x22 => Instruction::LD8(Ld8Location::atHLInc, Ld8Location::A),
+            // INC H
+            0x24 => Instruction::OP(Operator::INC, Operand::H),
+            // DEC H
+            0x25 => Instruction::OP(Operator::DEC, Operand::H),
+            // LD H, d8
+            0x26 => Instruction::LD8(Ld8Location::H, Ld8Location::Immediate),
+            // DAA
+            0x27 => Instruction::DAA,
             // JR Z,i8
             0x28 => Instruction::JP(JumpTarget::Offset, JumpCondition::ZeroFlag),
+            // LD A, (HL+)
+            0x2a => Instruction::LD8(Ld8Location::A, Ld8Location::atHLInc),
+            // INC L
+            0x2c => Instruction::OP(Operator::INC, Operand::L),
+            // DEC L
+            0x2d => Instruction::OP(Operator::DEC, Operand::L),
+            // LD L, d8
+            0x2e => Instruction::LD8(Ld8Location::L, Ld8Location::Immediate),
+            // CPL
+            0x2f => Instruction::CPL,
+
             // JR NC,i8
             0x30 => Instruction::JP(JumpTarget::Offset, JumpCondition::NotCarryFlag),
+            // LD SP, d16
+            0x31 => Instruction::LD16(Ld16Target::SP, Ld16Source::Immediate),
+            // LD (HL-), A
+            0x32 => Instruction::LD8(Ld8Location::atHLDec, Ld8Location::A),
+            // INC (HL)
+            0x34 => Instruction::OP(Operator::INC, Operand::atHL),
+            // DEC (HL)
+            0x35 => Instruction::OP(Operator::DEC, Operand::atHL),
+            // LD (HL), d8
+            0x36 => Instruction::LD8(Ld8Location::atHL, Ld8Location::Immediate),
+            // SCF
+            0x37 => Instruction::SCF,
             // JR C,i8
             0x38 => Instruction::JP(JumpTarget::Offset, JumpCondition::CarryFlag),
+            // LD A, (HL-)
+            0x3a => Instruction::LD8(Ld8Location::A, Ld8Location::atHLDec),
+            // INC A
+            0x3c => Instruction::OP(Operator::INC, Operand::A),
+            // DEC A
+            0x3d => Instruction::OP(Operator::DEC, Operand::A),
+            // LD A, d8
+            0x3e => Instruction::LD8(Ld8Location::A, Ld8Location::Immediate),
+            // CCF
+            0x3f => Instruction::CCF,
+
+            // LD B, B
+            0x40 => Instruction::LD8(Ld8Location::B, Ld8Location::B),
+            // LD B, C
+            0x41 => Instruction::LD8(Ld8Location::B, Ld8Location::C),
+            // LD B, D
+            0x42 => Instruction::LD8(Ld8Location::B, Ld8Location::D),
+            // LD B, E
+            0x43 => Instruction::LD8(Ld8Location::B, Ld8Location::E),
+            // LD B, H
+            0x44 => Instruction::LD8(Ld8Location::B, Ld8Location::H),
+            // LD B, L
+            0x45 => Instruction::LD8(Ld8Location::B, Ld8Location::L),
+            // LD B, (HL)
+            0x46 => Instruction::LD8(Ld8Location::B, Ld8Location::atHL),
+            // LD B, A
+            0x47 => Instruction::LD8(Ld8Location::B, Ld8Location::A),
+            // LD C, B
+            0x48 => Instruction::LD8(Ld8Location::C, Ld8Location::B),
+            // LD C, C
+            0x49 => Instruction::LD8(Ld8Location::C, Ld8Location::C),
+            // LD C, D
+            0x4a => Instruction::LD8(Ld8Location::C, Ld8Location::D),
+            // LD C, E
+            0x4b => Instruction::LD8(Ld8Location::C, Ld8Location::E),
+            // LD C, H
+            0x4c => Instruction::LD8(Ld8Location::C, Ld8Location::H),
+            // LD C, L
+            0x4d => Instruction::LD8(Ld8Location::C, Ld8Location::L),
+            // LD C, (HL)
+            0x4e => Instruction::LD8(Ld8Location::C, Ld8Location::atHL),
+            // LD C, A
+            0x4f => Instruction::LD8(Ld8Location::C, Ld8Location::A),
+
+            // LD D, B
+            0x50 => Instruction::LD8(Ld8Location::D, Ld8Location::B),
+            // LD D, C
+            0x51 => Instruction::LD8(Ld8Location::D, Ld8Location::C),
+            // LD D, D
+            0x52 => Instruction::LD8(Ld8Location::D, Ld8Location::D),
+            // LD D, E
+            0x53 => Instruction::LD8(Ld8Location::D, Ld8Location::E),
+            // LD D, H
+            0x54 => Instruction::LD8(Ld8Location::D, Ld8Location::H),
+            // LD D, L
+            0x55 => Instruction::LD8(Ld8Location::D, Ld8Location::L),
+            // LD D, (HL)
+            0x56 => Instruction::LD8(Ld8Location::D, Ld8Location::atHL),
+            // LD D, A
+            0x57 => Instruction::LD8(Ld8Location::D, Ld8Location::A),
+            // LD E, B
+            0x58 => Instruction::LD8(Ld8Location::E, Ld8Location::B),
+            // LD E, C
+            0x59 => Instruction::LD8(Ld8Location::E, Ld8Location::C),
+            // LD E, D
+            0x5a => Instruction::LD8(Ld8Location::E, Ld8Location::D),
+            // LD E, E
+            0x5b => Instruction::LD8(Ld8Location::E, Ld8Location::E),
+            // LD E, H
+            0x5c => Instruction::LD8(Ld8Location::E, Ld8Location::H),
+            // LD E, L
+            0x5d => Instruction::LD8(Ld8Location::E, Ld8Location::L),
+            // LD E, (HL)
+            0x5e => Instruction::LD8(Ld8Location::E, Ld8Location::atHL),
+            // LD E, A
+            0x5f => Instruction::LD8(Ld8Location::E, Ld8Location::A),
+
+            // LD H, B
+            0x60 => Instruction::LD8(Ld8Location::H, Ld8Location::B),
+            // LD H, C
+            0x61 => Instruction::LD8(Ld8Location::H, Ld8Location::C),
+            // LD H, D
+            0x62 => Instruction::LD8(Ld8Location::H, Ld8Location::D),
+            // LD H, E
+            0x63 => Instruction::LD8(Ld8Location::H, Ld8Location::E),
+            // LD H, H
+            0x64 => Instruction::LD8(Ld8Location::H, Ld8Location::H),
+            // LD H, L
+            0x65 => Instruction::LD8(Ld8Location::H, Ld8Location::L),
+            // LD H, (HL)
+            0x66 => Instruction::LD8(Ld8Location::H, Ld8Location::atHL),
+            // LD H, A
+            0x67 => Instruction::LD8(Ld8Location::H, Ld8Location::A),
+            // LD L, B
+            0x68 => Instruction::LD8(Ld8Location::L, Ld8Location::B),
+            // LD L, C
+            0x69 => Instruction::LD8(Ld8Location::L, Ld8Location::C),
+            // LD L, D
+            0x6a => Instruction::LD8(Ld8Location::L, Ld8Location::D),
+            // LD L, E
+            0x6b => Instruction::LD8(Ld8Location::L, Ld8Location::E),
+            // LD L, H
+            0x6c => Instruction::LD8(Ld8Location::L, Ld8Location::H),
+            // LD L, L
+            0x6d => Instruction::LD8(Ld8Location::L, Ld8Location::L),
+            // LD L, (HL)
+            0x6e => Instruction::LD8(Ld8Location::L, Ld8Location::atHL),
+            // LD L, A
+            0x6f => Instruction::LD8(Ld8Location::L, Ld8Location::A),
+
+            // LD (HL), B
+            0x70 => Instruction::LD8(Ld8Location::atHL, Ld8Location::B),
+            // LD (HL), C
+            0x71 => Instruction::LD8(Ld8Location::atHL, Ld8Location::C),
+            // LD (HL), D
+            0x72 => Instruction::LD8(Ld8Location::atHL, Ld8Location::D),
+            // LD (HL), E
+            0x73 => Instruction::LD8(Ld8Location::atHL, Ld8Location::E),
+            // LD (HL), H
+            0x74 => Instruction::LD8(Ld8Location::atHL, Ld8Location::H),
+            // LD (HL), L
+            0x75 => Instruction::LD8(Ld8Location::atHL, Ld8Location::L),
+            // HALT
+            // 0x76 => Instruction::HALT,
+            // LD (HL), A
+            0x77 => Instruction::LD8(Ld8Location::atHL, Ld8Location::A),
+            // LD A, B
+            0x78 => Instruction::LD8(Ld8Location::A, Ld8Location::B),
+            // LD A, C
+            0x79 => Instruction::LD8(Ld8Location::A, Ld8Location::C),
+            // LD A, D
+            0x7a => Instruction::LD8(Ld8Location::A, Ld8Location::D),
+            // LD A, E
+            0x7b => Instruction::LD8(Ld8Location::A, Ld8Location::E),
+            // LD A, H
+            0x7c => Instruction::LD8(Ld8Location::A, Ld8Location::H),
+            // LD A, L
+            0x7d => Instruction::LD8(Ld8Location::A, Ld8Location::L),
+            // LD A, (HL)
+            0x7e => Instruction::LD8(Ld8Location::A, Ld8Location::atHL),
+            // LD A, A
+            0x7f => Instruction::LD8(Ld8Location::A, Ld8Location::A),
 
             // ADD A, B
             0x80 => Instruction::OP(Operator::ADD, Operand::B),
@@ -187,9 +414,6 @@ impl Instruction {
             0x86 => Instruction::OP(Operator::ADD, Operand::atHL),
             // ADD A, A
             0x87 => Instruction::OP(Operator::ADD, Operand::A),
-            // ADD A, d8
-            0xc6 => Instruction::OP(Operator::ADD, Operand::Immediate),
-
             // ADC A, B
             0x88 => Instruction::OP(Operator::ADC, Operand::B),
             // ADC A, C
@@ -206,8 +430,6 @@ impl Instruction {
             0x8e => Instruction::OP(Operator::ADC, Operand::atHL),
             // ADC A, A
             0x8f => Instruction::OP(Operator::ADC, Operand::A),
-            // ADC A, d8
-            0xce => Instruction::OP(Operator::ADC, Operand::Immediate),
 
             // SUB A, B
             0x90 => Instruction::OP(Operator::SUB, Operand::B),
@@ -225,9 +447,6 @@ impl Instruction {
             0x96 => Instruction::OP(Operator::SUB, Operand::atHL),
             // SUB A, A
             0x97 => Instruction::OP(Operator::SUB, Operand::A),
-            // SUB A, d8 
-            0xd6 => Instruction::OP(Operator::SUB, Operand::Immediate),
-
             // SBC A, B
             0x98 => Instruction::OP(Operator::SBC, Operand::B),
             // SBC A, C
@@ -240,12 +459,10 @@ impl Instruction {
             0x9c => Instruction::OP(Operator::SBC, Operand::H),
             // SBC A, L
             0x9d => Instruction::OP(Operator::SBC, Operand::L),
-            // SBC A, (HL) 
+            // SBC A, (HL)
             0x9e => Instruction::OP(Operator::SBC, Operand::atHL),
             // SBC A, A
             0x9f => Instruction::OP(Operator::SBC, Operand::A),
-            // SBC A, d8 
-            0xde => Instruction::OP(Operator::SBC, Operand::Immediate),
 
             // AND A, B
             0xa0 => Instruction::OP(Operator::AND, Operand::B),
@@ -259,51 +476,10 @@ impl Instruction {
             0xa4 => Instruction::OP(Operator::AND, Operand::H),
             // AND A, L
             0xa5 => Instruction::OP(Operator::AND, Operand::L),
-            // AND A, (HL) 
+            // AND A, (HL)
             0xa6 => Instruction::OP(Operator::AND, Operand::atHL),
             // AND A, A
             0xa7 => Instruction::OP(Operator::AND, Operand::A),
-            // AND A, d8 
-            0xe6 => Instruction::OP(Operator::AND, Operand::Immediate),
-
-            // OR A, B
-            0xb0 => Instruction::OP(Operator::OR, Operand::B),
-            // OR A, C
-            0xb1 => Instruction::OP(Operator::OR, Operand::C),
-            // OR A, D
-            0xb2 => Instruction::OP(Operator::OR, Operand::D),
-            // OR A, E
-            0xb3 => Instruction::OP(Operator::OR, Operand::E),
-            // OR A, H
-            0xb4 => Instruction::OP(Operator::OR, Operand::H),
-            // OR A, L
-            0xb5 => Instruction::OP(Operator::OR, Operand::L),
-            // OR A, (HL) 
-            0xb6 => Instruction::OP(Operator::OR, Operand::atHL),
-            // OR A, A
-            0xb7 => Instruction::OP(Operator::OR, Operand::A),
-            // OR A, d8 
-            0xf6 => Instruction::OP(Operator::OR, Operand::Immediate),
-
-            // CP A, B
-            0xb8 => Instruction::OP(Operator::CP, Operand::B),
-            // CP A, C
-            0xb9 => Instruction::OP(Operator::CP, Operand::C),
-            // CP A, D
-            0xba => Instruction::OP(Operator::CP, Operand::D),
-            // CP A, E
-            0xbb => Instruction::OP(Operator::CP, Operand::E),
-            // CP A, H
-            0xbc => Instruction::OP(Operator::CP, Operand::H),
-            // CP A, L
-            0xbd => Instruction::OP(Operator::CP, Operand::L),
-            // CP A, (HL) 
-            0xbe => Instruction::OP(Operator::CP, Operand::atHL),
-            // CP A, A
-            0xbf => Instruction::OP(Operator::CP, Operand::A),
-            // CP A, d8 
-            0xfe => Instruction::OP(Operator::CP, Operand::Immediate),
-
             // XOR B
             0xa8 => Instruction::OP(Operator::XOR, Operand::B),
             // XOR C
@@ -320,54 +496,87 @@ impl Instruction {
             0xae => Instruction::OP(Operator::XOR, Operand::atHL),
             // XOR A
             0xaf => Instruction::OP(Operator::XOR, Operand::A),
+
+            // OR A, B
+            0xb0 => Instruction::OP(Operator::OR, Operand::B),
+            // OR A, C
+            0xb1 => Instruction::OP(Operator::OR, Operand::C),
+            // OR A, D
+            0xb2 => Instruction::OP(Operator::OR, Operand::D),
+            // OR A, E
+            0xb3 => Instruction::OP(Operator::OR, Operand::E),
+            // OR A, H
+            0xb4 => Instruction::OP(Operator::OR, Operand::H),
+            // OR A, L
+            0xb5 => Instruction::OP(Operator::OR, Operand::L),
+            // OR A, (HL)
+            0xb6 => Instruction::OP(Operator::OR, Operand::atHL),
+            // OR A, A
+            0xb7 => Instruction::OP(Operator::OR, Operand::A),
+            // CP A, B
+            0xb8 => Instruction::OP(Operator::CP, Operand::B),
+            // CP A, C
+            0xb9 => Instruction::OP(Operator::CP, Operand::C),
+            // CP A, D
+            0xba => Instruction::OP(Operator::CP, Operand::D),
+            // CP A, E
+            0xbb => Instruction::OP(Operator::CP, Operand::E),
+            // CP A, H
+            0xbc => Instruction::OP(Operator::CP, Operand::H),
+            // CP A, L
+            0xbd => Instruction::OP(Operator::CP, Operand::L),
+            // CP A, (HL)
+            0xbe => Instruction::OP(Operator::CP, Operand::atHL),
+            // CP A, A
+            0xbf => Instruction::OP(Operator::CP, Operand::A),
+
+            // JP NZ,a16
+            0xc2 => Instruction::JP(JumpTarget::Immediate, JumpCondition::NotZeroFlag),
+            // JP a16
+            0xc3 => Instruction::JP(JumpTarget::Immediate, JumpCondition::True),
+            // ADD A, d8
+            0xc6 => Instruction::OP(Operator::ADD, Operand::Immediate),
+            // JP Z,a16
+            0xca => Instruction::JP(JumpTarget::Immediate, JumpCondition::ZeroFlag),
+            // ADC A, d8
+            0xce => Instruction::OP(Operator::ADC, Operand::Immediate),
+
+            // JP NC,a16
+            0xd2 => Instruction::JP(JumpTarget::Immediate, JumpCondition::NotCarryFlag),
+            // SUB A, d8
+            0xd6 => Instruction::OP(Operator::SUB, Operand::Immediate),
+            // JP C,a16
+            0xda => Instruction::JP(JumpTarget::Immediate, JumpCondition::CarryFlag),
+            // SBC A, d8
+            0xde => Instruction::OP(Operator::SBC, Operand::Immediate),
+
+            // LD (a8), A
+            0xe0 => Instruction::LD8(Ld8Location::Address8, Ld8Location::A),
+            // LD (C), A
+            0xe2 => Instruction::LD8(Ld8Location::atC, Ld8Location::A),
+            // AND A, d8
+            0xe6 => Instruction::OP(Operator::AND, Operand::Immediate),
+            // JP HL
+            0xe9 => Instruction::JP(JumpTarget::HL, JumpCondition::True),
+            // LD (a16), A
+            0xea => Instruction::LD8(Ld8Location::Address16, Ld8Location::A),
             // XOR d8
             0xee => Instruction::OP(Operator::XOR, Operand::Immediate),
 
-            // INC B
-            0x04 => Instruction::OP(Operator::INC, Operand::B),
-            // INC C
-            0x0c => Instruction::OP(Operator::INC, Operand::C),
-            // INC D
-            0x14 => Instruction::OP(Operator::INC, Operand::D),
-            // INC E
-            0x1c => Instruction::OP(Operator::INC, Operand::E),
-            // INC H
-            0x24 => Instruction::OP(Operator::INC, Operand::H),
-            // INC L
-            0x2c => Instruction::OP(Operator::INC, Operand::L),
-            // INC (HL)
-            0x34 => Instruction::OP(Operator::INC, Operand::atHL),
-            // INC A
-            0x3c => Instruction::OP(Operator::INC, Operand::A),
-
-            // DEC B
-            0x05 => Instruction::OP(Operator::DEC, Operand::B),
-            // DEC C
-            0x0d => Instruction::OP(Operator::DEC, Operand::C),
-            // DEC D
-            0x15 => Instruction::OP(Operator::DEC, Operand::D),
-            // DEC E
-            0x1d => Instruction::OP(Operator::DEC, Operand::E),
-            // DEC H
-            0x25 => Instruction::OP(Operator::DEC, Operand::H),
-            // DEC L
-            0x2d => Instruction::OP(Operator::DEC, Operand::L),
-            // DEC (HL)
-            0x35 => Instruction::OP(Operator::DEC, Operand::atHL),
-            // DEC A
-            0x3d => Instruction::OP(Operator::DEC, Operand::A),
-
-            // CCF
-            0x3f => Instruction::CCF,
-            // SCF
-            0x37 => Instruction::SCF,
-            // DAA
-            0x27 => Instruction::DAA,
-            // CPL
-            0x2f => Instruction::CPL,
-
-            // LD HL, d16
-            0x21 => Instruction::LD16(Ld16Target::HL, Ld16Source::Immediate),
+            // LD A, (a8)
+            0xf0 => Instruction::LD8(Ld8Location::A, Ld8Location::Address8),
+            // LD A, (C)
+            0xf2 => Instruction::LD8(Ld8Location::A, Ld8Location::atC),
+            // OR A, d8
+            0xf6 => Instruction::OP(Operator::OR, Operand::Immediate),
+            // LD HL, SP+s8
+            0xf8 => Instruction::LD16(Ld16Target::HL, Ld16Source::SPOffset),
+            // LD SP, HL
+            0xf9 => Instruction::LD16(Ld16Target::SP, Ld16Source::HL),
+            // LD A, (a16)
+            0xfa => Instruction::LD8(Ld8Location::A, Ld8Location::Address16),
+            // CP A, d8
+            0xfe => Instruction::OP(Operator::CP, Operand::Immediate),
 
             _ => panic!("not implemented opcode {:#06x}", ext_opcode),
         }
@@ -768,44 +977,133 @@ impl Cpu {
                         self.set_h_flag(false);
                         self.set_c_flag(false);
                         self.set_a(result);
-                    },
+                    }
                     Operator::CP => self.op_cp(op_val),
                     Operator::INC => self.op_incdec(op_val, operand, true /* inc */),
                     Operator::DEC => self.op_incdec(op_val, operand, false /* inc */),
                 };
-            },
+            }
             Instruction::CCF => {
                 self.set_n_flag(false);
                 self.set_h_flag(false);
                 self.set_c_flag(!self.is_c_flag());
-            },
+            }
             Instruction::SCF => {
                 self.set_n_flag(false);
                 self.set_h_flag(false);
                 self.set_c_flag(true);
-            },
+            }
             Instruction::SCF => {
                 self.set_n_flag(false);
                 self.set_h_flag(false);
                 self.set_c_flag(true);
-            },
+            }
             Instruction::DAA => self.op_daa(),
             Instruction::CPL => {
                 let a = self.get_a();
                 self.set_a(!a);
                 self.set_n_flag(true);
                 self.set_h_flag(true);
-            },
+            }
             Instruction::LD16(target, source) => {
                 let val = match source {
                     Ld16Source::Immediate => u16::from_le_bytes([self.pc_fetch(), self.pc_fetch()]),
-                    _ => panic!("not implemented...."),
+                    Ld16Source::SP => self.get_sp(),
+                    Ld16Source::SPOffset => {
+                        // SP+s8
+                        // Cast to signed int, perform sign-extension, then cast back to uint.
+                        let offset = self.pc_fetch() as i8 as i16 as u16;
+                        self.get_sp().wrapping_add(offset)
+                    }
+                    Ld16Source::HL => self.get_hl(),
                 };
+
                 match target {
                     Ld16Target::HL => self.set_hl(val),
-                    _ => panic!("not implemented...."),
+                    Ld16Target::BC => self.set_bc(val),
+                    Ld16Target::DE => self.set_de(val),
+                    Ld16Target::HL => self.set_hl(val),
+                    Ld16Target::SP => self.set_pc(val),
+                    Ld16Target::Address => {
+                        // only supported for LD (a16), SP, so it is safe to fetch next byte.
+                        let addr = u16::from_le_bytes([self.pc_fetch(), self.pc_fetch()]);
+                        self.cycle(); // ?
+                        self.mem.setw(addr, val);
+                    } // a16
                 };
-            },
+            }
+            Instruction::LD8(target, source) => {
+                // TODO: fix cycles for memory accesses.
+                // Only either source or target can contain an immediate / address value.
+                // Therefore, it is safe to process source before target.
+                let val = match source {
+                    Ld8Location::A => self.get_a(),
+                    Ld8Location::B => self.get_b(),
+                    Ld8Location::C => self.get_c(),
+                    Ld8Location::D => self.get_d(),
+                    Ld8Location::E => self.get_e(),
+                    Ld8Location::H => self.get_h(),
+                    Ld8Location::L => self.get_l(),
+                    Ld8Location::atBC => self.mem.get(self.get_bc()),
+                    Ld8Location::atDE => self.mem.get(self.get_de()),
+                    Ld8Location::atHL => self.mem.get(self.get_hl()),
+                    Ld8Location::atHLInc => {
+                        // TODO: cycle
+                        let hl = self.get_hl();
+                        self.set_hl(hl.wrapping_add(1));
+                        self.mem.get(hl)
+                    }
+                    Ld8Location::atHLDec => {
+                        // TODO: cycle
+                        let hl = self.get_hl();
+                        self.set_hl(hl.wrapping_sub(1));
+                        self.mem.get(hl)
+                    }
+                    Ld8Location::atC => self.mem.get(self.get_c() as u16),
+                    Ld8Location::Address8 => {
+                        let addr = self.pc_fetch() as u16;
+                        self.mem.get(addr)
+                    }
+                    Ld8Location::Address16 => {
+                        let addr = u16::from_le_bytes([self.pc_fetch(), self.pc_fetch()]);
+                        self.mem.get(addr)
+                    }
+                    Ld8Location::Immediate => self.pc_fetch(),
+                };
+
+                match target {
+                    Ld8Location::A => self.set_a(val),
+                    Ld8Location::B => self.set_b(val),
+                    Ld8Location::C => self.set_c(val),
+                    Ld8Location::D => self.set_d(val),
+                    Ld8Location::E => self.set_e(val),
+                    Ld8Location::H => self.set_h(val),
+                    Ld8Location::L => self.set_l(val),
+                    Ld8Location::atBC => self.mem.set(self.get_bc(), val),
+                    Ld8Location::atDE => self.mem.set(self.get_de(), val),
+                    Ld8Location::atHL => self.mem.set(self.get_hl(), val),
+                    Ld8Location::atHLInc => {
+                        let hl = self.get_hl();
+                        self.mem.set(hl, val);
+                        self.set_hl(hl.wrapping_add(1));
+                    }
+                    Ld8Location::atHLDec => {
+                        let hl = self.get_hl();
+                        self.mem.set(hl, val);
+                        self.set_hl(hl.wrapping_sub(1));
+                    }
+                    Ld8Location::atC => self.mem.set(self.get_c() as u16, val),
+                    Ld8Location::Address8 => {
+                        let addr = self.pc_fetch() as u16;
+                        self.mem.set(addr, val);
+                    }
+                    Ld8Location::Address16 => {
+                        let addr = u16::from_le_bytes([self.pc_fetch(), self.pc_fetch()]);
+                        self.mem.set(addr, val);
+                    }
+                    Ld8Location::Immediate => panic!("Invalid LD8 target"),
+                }
+            }
 
             _ => return Err(()),
         };
