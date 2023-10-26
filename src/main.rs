@@ -769,7 +769,7 @@ impl Cpu {
         let pc = self.get_pc();
         let byte = self.mem.get(pc);
         // Increment program counter
-        self.set_pc(pc + 1);
+        self.set_pc(pc.wrapping_add(1));
         return byte;
     }
 
@@ -835,9 +835,9 @@ impl Cpu {
             val.wrapping_sub(1)
         };
         let h = if inc {
-            ((0x0f & val) + 1) & 0x10 == 0x10
+            ((0x0f & val).wrapping_add(1)) & 0x10 == 0x10
         } else {
-            ((0x0f & val) - 1) & 0x10 == 0x10
+            ((0x0f & val).wrapping_sub(1)) & 0x10 == 0x10
         };
 
         self.set_z_flag(result == 0);
@@ -864,20 +864,26 @@ impl Cpu {
 
     fn op_daa(&mut self) {
         let mut a = self.get_a();
-        if self.is_n_flag() { // after subtraction
-            if self.is_c_flag() { // top nibble
-                a -= 0x60;
+        if self.is_n_flag() {
+            // after subtraction
+            if self.is_c_flag() {
+                // top nibble
+                a = a.wrapping_sub(0x60);
             }
-            if self.is_h_flag() { // bottom nibble
-                a -= 0x06;
+            if self.is_h_flag() {
+                // bottom nibble
+                a = a.wrapping_sub(0x06);
             }
-        } else { // after addition
-            if self.is_c_flag() || a > 0x99 { // top nibble
-                a += 0x60;
+        } else {
+            // after addition
+            if self.is_c_flag() || a > 0x99 {
+                // top nibble
+                a = a.wrapping_add(0x60);
                 self.set_c_flag(true);
             }
-            if self.is_h_flag() || (a & 0x0f) > 0x09 { // bottom nibble
-                a += 0x06;
+            if self.is_h_flag() || (a & 0x0f) > 0x09 {
+                // bottom nibble
+                a = a.wrapping_add(0x06);
             }
         }
         self.set_a(a);
@@ -918,10 +924,11 @@ impl Cpu {
                     JumpTarget::Offset => {
                         // JR e takes 3 cycles but only performs 2 pc_fetch'es.
                         self.cycle();
-                        // order matters.
-                        let e = (self.pc_fetch() as i8) as i32;
-                        let pc = self.get_pc() as i32;
-                        (pc + e) as u16
+                        // Careful: pc_fetch() must happen before get_pc()
+                        // First cast to i8 to preserve sign, cast to i16 to perform
+                        // sign-extension, and back to uint for wrapping addition.
+                        let e = self.pc_fetch() as i8 as i16 as u16;
+                        self.get_pc().wrapping_add(e)
                     }
                 };
                 let conditionMet: bool = match condition {
