@@ -1030,7 +1030,7 @@ impl Cpu {
                     Ld16Target::BC => self.set_bc(val),
                     Ld16Target::DE => self.set_de(val),
                     Ld16Target::HL => self.set_hl(val),
-                    Ld16Target::SP => self.set_pc(val),
+                    Ld16Target::SP => self.set_sp(val),
                     Ld16Target::Address => {
                         // only supported for LD (a16), SP, so it is safe to fetch next byte.
                         let addr = u16::from_le_bytes([self.pc_fetch(), self.pc_fetch()]);
