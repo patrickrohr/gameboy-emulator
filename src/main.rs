@@ -50,6 +50,16 @@ impl MemMapper {
         // consider panicking here...
         // do nothing for now.
     }
+
+    fn setw(&mut self, addr: u16, val: u16) {
+        let bytes = val.to_le_bytes();
+        if addr >= 0x8000 {
+            self.ram[(addr - 0x8000) as usize] = bytes[0];
+            self.ram[(addr - 0x8000 + 1) as usize] = bytes[1];
+        }
+        // consider panicking here...
+        // do nothing for now.
+    }
 }
 
 // LOAD
